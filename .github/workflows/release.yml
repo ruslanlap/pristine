@@ -54,10 +54,11 @@ jobs:
         run: |
           version="${GITHUB_REF_NAME#v}"
           name="pristine-${version}-${{ matrix.target }}"
-          mkdir -p "dist/${name}"
-          cp "target/${{ matrix.target }}/release/pristine" "dist/${name}/pristine"
-          cp LICENSE README.md "dist/${name}/"
-          tar -czf "dist/${name}.tar.gz" -C dist "$name"
+          stage="${RUNNER_TEMP}/${name}"
+          mkdir -p "$stage" dist
+          cp "target/${{ matrix.target }}/release/pristine" "${stage}/pristine"
+          cp LICENSE README.md "${stage}/"
+          tar -czf "dist/${name}.tar.gz" -C "$RUNNER_TEMP" "$name"
       - name: Package Windows binary
         if: runner.os == 'Windows'
         shell: pwsh
@@ -73,7 +74,9 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: pristine-${{ matrix.target }}
-          path: dist/*
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
           if-no-files-found: error
           retention-days: 1
 
@@ -92,7 +95,7 @@ jobs:
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "$GITHUB_REF_NAME"
+        run: gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/*.zip dist/SHA256SUMS --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "$GITHUB_REF_NAME"
 
   publish-crate:
     needs: release
