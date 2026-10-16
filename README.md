@@ -1,5 +1,7 @@
 # pristine
 
+![CI](https://github.com/ruslanlap/pristine/actions/workflows/ci.yml/badge.svg)
+
 A `docs:` pull request can quietly include application code, configuration, or other changes outside documentation. Reviewing every changed path by hand is easy to forget. `pristine` gives you a local, read-only advisory when that happens.
 
 ## What it checks
@@ -43,3 +45,5 @@ The check is read-only; it does not change files, commits, or pull requests.
 ## Contributing and license
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development and verification commands. This project is licensed under the [MIT License](LICENSE). Security reporting guidance is in [SECURITY.md](SECURITY.md).
+
+Try the clean and finding paths locally with [`examples/smoke.sh`](examples/smoke.sh).

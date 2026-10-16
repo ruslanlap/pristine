@@ -2,6 +2,13 @@
 name = "pristine-scope"
 version = "0.1.0"
 edition = "2021"
+description = "Local, read-only advisory for non-documentation paths in docs-prefixed pull requests"
+authors = ["Ruslan Lapin"]
+license = "MIT"
+repository = "https://github.com/ruslanlap/pristine"
+readme = "README.md"
+keywords = ["git", "pull-request", "documentation", "scope-check"]
+categories = ["command-line-utilities", "development-tools"]
 
 [[bin]]
 name = "pristine"
