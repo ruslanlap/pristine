@@ -15,7 +15,7 @@
 
 **Purpose**: Establish the smallest Rust binary crate.
 
-- [ ] T001 Create `Cargo.toml` for package `pristine-scope` with binary name `pristine`, edition 2021, no third-party dependencies; create `.gitignore` containing `/target/`, `src/main.rs`, and `tests/cli.rs`.
+- [ ] T001 Create `Cargo.toml` for package `pristine-scope` with binary name `pristine`, edition 2021, no third-party dependencies; verify root `.gitignore` excludes `/target/` and `/.worktrees/`, and create `src/main.rs` plus `tests/cli.rs`.
 
 ## Phase 2: Core CLI — User Story 1 (P1) and User Story 2 (P2)
 
