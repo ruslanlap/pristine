@@ -70,21 +70,26 @@ fn run() -> Result<(), String> {
     }
     let base = base.ok_or("missing --base <ref>")?;
     let title = title.ok_or("missing --title <title>")?;
-    if !git(&["rev-parse", "--show-toplevel"]).is_ok() {
-        return Err("not inside a Git repository".into());
-    }
+    git(&["rev-parse", "--show-toplevel"]).map_err(|e| format!("Git inspection failed: {e}"))?;
     let base = git(&[
         "rev-parse",
         "--verify",
         "--quiet",
+        "--end-of-options",
         &format!("{base}^{{commit}}"),
     ])
     .map_err(|_| format!("base ref is not a valid commit: {base}"))?;
     let base = std::str::from_utf8(&base)
         .map_err(|_| "Git returned an invalid base commit")?
         .trim();
-    let paths = git(&["diff", "--name-only", "-z", &format!("{base}...HEAD")])
-        .map_err(|e| format!("Git diff failed: {e}"))?;
+    let paths = git(&[
+        "diff",
+        "--no-renames",
+        "--name-only",
+        "-z",
+        &format!("{base}...HEAD"),
+    ])
+    .map_err(|e| format!("Git diff failed: {e}"))?;
     let paths = paths
         .split(|byte| *byte == 0)
         .filter(|path| !path.is_empty())

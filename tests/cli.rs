@@ -2,6 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 static NEXT: AtomicUsize = AtomicUsize::new(0);
 
@@ -10,7 +11,12 @@ struct Repo(PathBuf);
 impl Repo {
     fn new() -> Self {
         let id = NEXT.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir().join(format!("pristine-cli-{}-{id}", std::process::id()));
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path =
+            std::env::temp_dir().join(format!("pristine-cli-{}-{nonce}-{id}", std::process::id()));
         fs::create_dir_all(&path).unwrap();
         git(&path, &["init", "-q"]);
         git(&path, &["config", "user.email", "test@example.invalid"]);
@@ -41,6 +47,15 @@ impl Repo {
     fn check(&self, base: &str, title: &str) -> Output {
         Command::new(env!("CARGO_BIN_EXE_pristine"))
             .current_dir(&self.0)
+            .args(["check", "--base", base, "--title", title])
+            .output()
+            .unwrap()
+    }
+
+    fn check_with_git_config(&self, base: &str, title: &str, config: &Path) -> Output {
+        Command::new(env!("CARGO_BIN_EXE_pristine"))
+            .current_dir(&self.0)
+            .env("GIT_CONFIG_GLOBAL", config)
             .args(["check", "--base", base, "--title", title])
             .output()
             .unwrap()
@@ -165,7 +180,12 @@ fn nonmatching_prefixes_are_unsupported_not_scope_judgments() {
 
 #[test]
 fn outside_repository_and_invalid_base_are_operational_errors() {
-    let outside = std::env::temp_dir().join(format!("pristine-outside-{}", std::process::id()));
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let outside =
+        std::env::temp_dir().join(format!("pristine-outside-{}-{nonce}", std::process::id()));
     fs::create_dir_all(&outside).unwrap();
     let result = Command::new(env!("CARGO_BIN_EXE_pristine"))
         .current_dir(&outside)
@@ -212,6 +232,32 @@ fn deleted_source_path_is_reported() {
     let result = repo.check(&base, "docs: remove source");
     assert_eq!(result.status.code(), Some(1));
     assert!(text(&result.stdout).contains("src/old.rs"));
+}
+
+#[test]
+fn rename_into_docs_still_reports_the_old_source_path() {
+    let repo = Repo::new();
+    repo.add("src/moved.rs", "source\\n");
+    let base = repo.base();
+    fs::create_dir_all(repo.0.join("docs")).unwrap();
+    fs::rename(repo.0.join("src/moved.rs"), repo.0.join("docs/moved.rs")).unwrap();
+    git(&repo.0, &["add", "-A"]);
+    git(&repo.0, &["commit", "-qm", "move source into docs"]);
+    let result = repo.check(&base, "docs: move file");
+    assert_eq!(result.status.code(), Some(1));
+    assert!(text(&result.stdout).contains("src/moved.rs"));
+}
+
+#[test]
+fn git_configuration_failure_is_preserved_as_git_inspection_error() {
+    let repo = Repo::new();
+    let config = repo.0.join("bad-git-config");
+    fs::write(&config, "[broken\\n").unwrap();
+    let result = repo.check_with_git_config(&repo.base(), "docs: test", &config);
+    assert_eq!(result.status.code(), Some(2));
+    let error = text(&result.stderr).to_lowercase();
+    assert!(error.contains("git") && error.contains("config"), "{error}");
+    assert!(!error.contains("not inside a git repository"), "{error}");
 }
 
 #[test]
