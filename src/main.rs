@@ -118,10 +118,7 @@ impl CustomConfig {
                         "true" => cfg.allow_doc_configs = Some(true),
                         "false" => cfg.allow_doc_configs = Some(false),
                         _ => {
-                            return Err(format!(
-                                "invalid boolean at line {}: {val}",
-                                line_idx + 1
-                            ))
+                            return Err(format!("invalid boolean at line {}: {val}", line_idx + 1))
                         }
                     }
                     continue;
@@ -382,7 +379,10 @@ fn parse_raw_diff(raw: &[u8]) -> Result<Vec<ChangedEntry>, String> {
             .map_err(|_| "Git path is not valid UTF-8")?
             .to_owned();
         // Format of metadata: ":<old_mode> <new_mode> <old_sha> <new_sha> <status>"
-        let parts: Vec<&str> = meta_str.trim_start_matches(':').split_whitespace().collect();
+        let parts: Vec<&str> = meta_str
+            .trim_start_matches(':')
+            .split_whitespace()
+            .collect();
         let mut is_symlink_or_submodule = false;
         if parts.len() >= 2 {
             let old_mode = parts[0];
