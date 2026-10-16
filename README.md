@@ -14,7 +14,13 @@ pristine inspects local Git data only. It does not use a GitHub token, network c
 
 ## Install and use
 
-Build from source with Rust stable and Git installed:
+Install from crates.io with Rust stable and Git installed:
+
+```sh
+cargo install pristine-scope
+```
+
+Or install from this checkout:
 
 ```sh
 cargo install --path .

@@ -9,6 +9,7 @@ repository = "https://github.com/ruslanlap/pristine"
 readme = "README.md"
 keywords = ["git", "pull-request", "documentation", "scope-check"]
 categories = ["command-line-utilities", "development-tools"]
+exclude = [".github/**", ".specify/**", "specs/**"]
 
 [[bin]]
 name = "pristine"
