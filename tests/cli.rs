@@ -61,6 +61,14 @@ impl Repo {
             .unwrap()
     }
 
+    fn check_args(&self, args: &[&str]) -> Output {
+        Command::new(env!("CARGO_BIN_EXE_pristine"))
+            .current_dir(&self.0)
+            .args(args)
+            .output()
+            .unwrap()
+    }
+
     fn state(&self) -> String {
         format!(
             "{}\n{}",
@@ -247,7 +255,7 @@ fn deleted_source_path_is_reported() {
 #[test]
 fn rename_into_docs_still_reports_the_old_source_path() {
     let repo = Repo::new();
-    repo.add("src/moved.rs", "source\\n");
+    repo.add("src/moved.rs", "source\n");
     let base = repo.base();
     fs::create_dir_all(repo.0.join("docs")).unwrap();
     fs::rename(repo.0.join("src/moved.rs"), repo.0.join("docs/moved.rs")).unwrap();
@@ -262,7 +270,7 @@ fn rename_into_docs_still_reports_the_old_source_path() {
 fn git_configuration_failure_is_preserved_as_git_inspection_error() {
     let repo = Repo::new();
     let config = repo.0.join("bad-git-config");
-    fs::write(&config, "[broken\\n").unwrap();
+    fs::write(&config, "[broken\n").unwrap();
     let result = repo.check_with_git_config(&repo.base(), "docs: test", &config);
     assert_eq!(result.status.code(), Some(2));
     let error = text(&result.stderr).to_lowercase();
@@ -278,4 +286,143 @@ fn help_is_successful() {
         .unwrap();
     assert_eq!(result.status.code(), Some(0));
     assert!(text(&result.stdout).contains("pristine check"));
+}
+
+#[test]
+fn formats_json_github_and_agent_report_violations() {
+    let repo = Repo::new();
+    let base = repo.base();
+    repo.add("src/lib.rs", "pub fn a() {}\n");
+
+    let json_res = repo.check_args(&[
+        "check",
+        "--base",
+        &base,
+        "--title",
+        "docs: update readme",
+        "--format",
+        "json",
+    ]);
+    assert_eq!(json_res.status.code(), Some(1));
+    let json_out = text(&json_res.stdout);
+    assert!(json_out.contains("\"status\":\"violation\""));
+    assert!(json_out.contains("\"src/lib.rs\""));
+
+    let gh_res = repo.check_args(&[
+        "check",
+        "--base",
+        &base,
+        "--title",
+        "docs: update readme",
+        "--format",
+        "github",
+    ]);
+    assert_eq!(gh_res.status.code(), Some(1));
+    let gh_out = text(&gh_res.stdout);
+    assert!(gh_out.contains("::error file=src/lib.rs"));
+
+    let agent_res = repo.check_args(&[
+        "check",
+        "--base",
+        &base,
+        "--title",
+        "docs: update readme",
+        "--agent",
+    ]);
+    assert_eq!(agent_res.status.code(), Some(1));
+    let agent_out = text(&agent_res.stdout);
+    assert!(agent_out.contains("[PRISTINE VIOLATION]"));
+    assert!(agent_out.contains("src/lib.rs"));
+}
+
+#[test]
+fn conventional_commit_prefixes_ci_test_style_are_supported() {
+    let repo = Repo::new();
+    let base = repo.base();
+    repo.add(".github/workflows/ci.yml", "name: CI\n");
+    assert_eq!(
+        repo.check(&base, "ci: update workflow").status.code(),
+        Some(0)
+    );
+    repo.add("src/main.rs", "fn main() {}\n");
+    assert_eq!(
+        repo.check(&base, "ci(actions): update workflow")
+            .status
+            .code(),
+        Some(1)
+    );
+
+    let test_repo = Repo::new();
+    let test_base = test_repo.base();
+    test_repo.add("tests/integration_test.rs", "#[test] fn t() {}\n");
+    assert_eq!(
+        test_repo
+            .check(&test_base, "test: add integration")
+            .status
+            .code(),
+        Some(0)
+    );
+
+    let style_repo = Repo::new();
+    let style_base = style_repo.base();
+    style_repo.add("assets/theme.css", "body {}\n");
+    assert_eq!(
+        style_repo
+            .check(&style_base, "style: update theme")
+            .status
+            .code(),
+        Some(0)
+    );
+}
+
+#[test]
+fn allow_doc_configs_flag_and_pristine_toml_work() {
+    let repo = Repo::new();
+    let base = repo.base();
+    repo.add(".markdownlint.json", "{}\n");
+    assert_eq!(
+        repo.check(&base, "docs: lint config").status.code(),
+        Some(1)
+    );
+
+    let allowed = repo.check_args(&[
+        "check",
+        "--base",
+        &base,
+        "--title",
+        "docs: lint config",
+        "--allow-doc-configs",
+    ]);
+    assert_eq!(allowed.status.code(), Some(0));
+
+    let custom_repo = Repo::new();
+    let custom_base = custom_repo.base();
+    custom_repo.add("custom_docs/notes.txt", "notes\n");
+    fs::write(
+        custom_repo.0.join("pristine.toml"),
+        "[docs]\nallow = [\"custom_docs/**\"]\n",
+    )
+    .unwrap();
+    assert_eq!(
+        custom_repo
+            .check(&custom_base, "docs: add custom notes")
+            .status
+            .code(),
+        Some(0)
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn symlink_inside_docs_is_flagged_as_violation() {
+    use std::os::unix::fs::symlink;
+    let repo = Repo::new();
+    let base = repo.base();
+    fs::create_dir_all(repo.0.join("docs")).unwrap();
+    symlink("../seed", repo.0.join("docs/link.md")).unwrap();
+    git(&repo.0, &["add", "docs/link.md"]);
+    git(&repo.0, &["commit", "-qm", "add symlink in docs"]);
+    let result = repo.check(&base, "docs: add symlink");
+    assert_eq!(result.status.code(), Some(1));
+    assert!(text(&result.stdout).contains("docs/link.md"));
 }

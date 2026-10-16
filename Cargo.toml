@@ -2,12 +2,12 @@
 name = "pristine-scope"
 version = "0.1.0"
 edition = "2021"
-description = "Local, read-only advisory for non-documentation paths in docs-prefixed pull requests"
+description = "Local, read-only PR scope & intent guardrail for fast-moving teams and AI agents"
 authors = ["Ruslan Lapin"]
 license = "MIT"
 repository = "https://github.com/ruslanlap/pristine"
 readme = "README.md"
-keywords = ["git", "pull-request", "documentation", "scope-check"]
+keywords = ["git", "pull-request", "conventional-commits", "ci", "scope-check"]
 categories = ["command-line-utilities", "development-tools"]
 exclude = [".github/**", ".specify/**", "specs/**"]
 

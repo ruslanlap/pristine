@@ -1,0 +1,116 @@
+name: "Pristine Scope Check"
+description: "Local, read-only PR scope & intent guardrail for fast-moving teams and AI agents"
+author: "Ruslan Lapin"
+branding:
+  icon: "shield"
+  color: "green"
+
+inputs:
+  base:
+    description: "Base Git reference or SHA to diff against (defaults to PR base SHA or main)"
+    required: false
+    default: ""
+  title:
+    description: "Pull request or commit title (defaults to GitHub PR title or commit subject)"
+    required: false
+    default: ""
+  format:
+    description: "Output format: text, json, github, or agent"
+    required: false
+    default: "github"
+  allow-doc-configs:
+    description: "Allow documentation tool configs (.markdownlint.json, .cspell.json, etc.) in docs: PRs"
+    required: false
+    default: "false"
+  config:
+    description: "Optional path to pristine.toml configuration file"
+    required: false
+    default: ""
+  version:
+    description: "Version of pristine to use (e.g. latest or 0.1.0)"
+    required: false
+    default: "latest"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install or build pristine
+      shell: bash
+      env:
+        PRISTINE_VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        BIN_DIR="${RUNNER_TEMP}/pristine-bin"
+        mkdir -p "$BIN_DIR"
+        echo "$BIN_DIR" >> "$GITHUB_PATH"
+
+        if [[ -f "${GITHUB_ACTION_PATH}/Cargo.toml" ]] && command -v cargo >/dev/null 2>&1 && [[ "$PRISTINE_VERSION" == "local" ]]; then
+          cargo build --release --manifest-path "${GITHUB_ACTION_PATH}/Cargo.toml"
+          cp "${GITHUB_ACTION_PATH}/target/release/pristine" "$BIN_DIR/"
+          exit 0
+        fi
+
+        OS="$(uname -s)"
+        ARCH="$(uname -m)"
+        case "$OS-$ARCH" in
+          Linux-x86_64) TARGET="x86_64-unknown-linux-gnu"; EXT="tar.gz" ;;
+          Darwin-x86_64) TARGET="x86_64-apple-darwin"; EXT="tar.gz" ;;
+          Darwin-arm64) TARGET="aarch64-apple-darwin"; EXT="tar.gz" ;;
+          MINGW*-x86_64|MSYS*-x86_64|Windows_NT-x86_64) TARGET="x86_64-pc-windows-msvc"; EXT="zip" ;;
+          *) TARGET="" ;;
+        esac
+
+        if [[ -n "$TARGET" ]]; then
+          if [[ "$PRISTINE_VERSION" == "latest" ]]; then
+            RELEASE_URL="https://api.github.com/repos/ruslanlap/pristine/releases/latest"
+          else
+            RELEASE_URL="https://api.github.com/repos/ruslanlap/pristine/releases/tags/v${PRISTINE_VERSION#v}"
+          fi
+          ASSET_URL=$(curl -sSfL "$RELEASE_URL" | grep -oE "https://github.com/ruslanlap/pristine/releases/download/[^\"]+${TARGET}\.${EXT}" | head -n 1 || true)
+          if [[ -n "$ASSET_URL" ]]; then
+            ARCHIVE="${RUNNER_TEMP}/pristine.${EXT}"
+            curl -sSfL "$ASSET_URL" -o "$ARCHIVE"
+            if [[ "$EXT" == "tar.gz" ]]; then
+              tar -xzf "$ARCHIVE" -C "$RUNNER_TEMP"
+              find "$RUNNER_TEMP" -maxdepth 2 -name "pristine" -type f -exec cp {} "$BIN_DIR/pristine" \;
+              chmod +x "$BIN_DIR/pristine"
+              exit 0
+            fi
+          fi
+        fi
+
+        if command -v cargo >/dev/null 2>&1; then
+          cargo build --release --manifest-path "${GITHUB_ACTION_PATH}/Cargo.toml"
+          cp "${GITHUB_ACTION_PATH}/target/release/pristine"* "$BIN_DIR/"
+        else
+          echo "::error::Could not download prebuilt pristine binary and cargo is not installed."
+          exit 2
+        fi
+
+    - name: Run pristine check
+      shell: bash
+      env:
+        INPUT_BASE: ${{ inputs.base }}
+        INPUT_TITLE: ${{ inputs.title }}
+        INPUT_FORMAT: ${{ inputs.format }}
+        INPUT_ALLOW_DOC_CONFIGS: ${{ inputs.allow-doc-configs }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        PR_TITLE: ${{ github.event.pull_request.title }}
+      run: |
+        set -euo pipefail
+        BASE="${INPUT_BASE:-${PR_BASE_SHA:-origin/main}}"
+        TITLE="${INPUT_TITLE:-${PR_TITLE:-}}"
+        if [[ -z "$TITLE" ]]; then
+          TITLE="$(git log -1 --pretty=%s)"
+        fi
+
+        ARGS=("check" "--base" "$BASE" "--title" "$TITLE" "--format" "$INPUT_FORMAT")
+        if [[ "$INPUT_ALLOW_DOC_CONFIGS" == "true" ]]; then
+          ARGS+=("--allow-doc-configs")
+        fi
+        if [[ -n "$INPUT_CONFIG" ]]; then
+          ARGS+=("--config" "$INPUT_CONFIG")
+        fi
+
+        pristine "${ARGS[@]}"
