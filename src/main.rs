@@ -23,16 +23,17 @@ fn is_documentation(path: &str) -> bool {
         return true;
     }
     let basename = lower.rsplit('/').next().unwrap_or(&lower);
-    if [
-        "readme",
-        "changelog",
-        "contributing",
-        "code_of_conduct",
-        "security",
-        "license",
-    ]
-    .iter()
-    .any(|family| basename.starts_with(family))
+    if !lower.contains('/')
+        && [
+            "readme",
+            "changelog",
+            "contributing",
+            "code_of_conduct",
+            "security",
+            "license",
+        ]
+        .iter()
+        .any(|family| basename.starts_with(family))
     {
         return true;
     }

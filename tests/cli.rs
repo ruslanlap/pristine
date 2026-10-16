@@ -149,6 +149,16 @@ fn documentation_directories_and_root_readmes_are_clean() {
 }
 
 #[test]
+fn nested_license_without_extension_is_reported_as_non_documentation() {
+    let repo = Repo::new();
+    let base = repo.base();
+    repo.add("src/LICENSE", "license\n");
+    let result = repo.check(&base, "docs: update docs");
+    assert_eq!(result.status.code(), Some(1));
+    assert!(text(&result.stdout).contains("src/LICENSE"));
+}
+
+#[test]
 fn mixed_paths_report_rule_and_every_source_path() {
     let repo = Repo::new();
     let base = repo.base();
