@@ -1,6 +1,7 @@
 # pristine
 
 ![CI](https://github.com/ruslanlap/pristine/actions/workflows/ci.yml/badge.svg)
+[![crates.io](https://img.shields.io/crates/v/pristine-scope)](https://crates.io/crates/pristine-scope)
 
 A `docs:` pull request can quietly include application code, configuration, or other changes outside documentation. Reviewing every changed path by hand is easy to forget. `pristine` gives you a local, read-only advisory when that happens.
 
@@ -19,6 +20,8 @@ Install from crates.io with Rust stable and Git installed:
 ```sh
 cargo install pristine-scope
 ```
+
+Or download a prebuilt binary from the [latest GitHub Release](https://github.com/ruslanlap/pristine/releases/latest). Archives are available for Linux x86_64, macOS Intel and Apple Silicon, and Windows x86_64. Git must be installed and available on `PATH`.
 
 Or install from this checkout:
 
@@ -47,6 +50,10 @@ docs: titles should change documentation paths only; non-documentation paths fou
 ```
 
 The check is read-only; it does not change files, commits, or pull requests.
+
+## Releasing
+
+Push a `vX.Y.Z` tag matching the version in `Cargo.toml`. The Release workflow verifies and builds Linux x86_64, macOS Intel/Apple Silicon, and Windows x86_64 archives, attaches them with checksums to a GitHub Release, then publishes to crates.io. Before the first automated publish, configure crates.io Trusted Publishing for owner `ruslanlap`, repository `pristine`, workflow `release.yml` (no environment). See the [Trusted Publishing guide](https://crates.io/docs/trusted-publishing).
 
 ## Contributing and license
 
